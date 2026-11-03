@@ -480,9 +480,13 @@
   const blocked = () => busy || overlayMode || micPaused || !el.timesup.hidden || !el.restartAsk.hidden;
   function canListen() { return state && state.playing && !blocked() && !state.grownup; }
 
+  // Each listener gets a say: a "not yet" only counts once every listener heard something else.
+  const wrongFrom = new Set();
+  let wrongCard = -1;
   function handleSpeech(msg) {
     if (!canListen()) return;
     const it = current();
+    if (wrongCard !== shownAt) { wrongFrom.clear(); wrongCard = shownAt; }
     const keys = speech.parse(msg.text);
     if (msg.type === "partial") {
       // Early yes as soon as the right word shows up ("twenty" waits, in case it's "twenty one").
@@ -494,8 +498,11 @@
       if (msg.text && msg.text.trim()) el.listenText.textContent = "Hmm, I didn't catch that. Say it again!";
       return;
     }
-    if (keys.includes(it.key)) mark("right", it.key);
-    else mark("wrong", keys[keys.length - 1]);
+    if (keys.includes(it.key)) { mark("right", it.key); return; }
+    wrongFrom.add(msg.src || 0);
+    if (wrongFrom.size < (speech.listeners || 1)) return;
+    wrongFrom.clear();
+    mark("wrong", keys[keys.length - 1]);
   }
   if (speech) speech.on(handleSpeech);
 

@@ -6,23 +6,31 @@
 
   const MODEL_URL = "model/vosk-model-small-en-us-0.15.tar.gz";
 
-  // Words a child might say for each letter name. Same-sounding words count ("see" for C, "you" for U).
+  // Words a child might say for each letter name. Same-sounding words count ("see" for C, "you" for U),
+  // plus the ways young kids often say them ("double" for W, "free" for 3). Tuned on kid-like test voices.
   const LETTER_WORDS = {
-    a: ["a", "ay", "hey"], b: ["b", "bee", "be"], c: ["c", "see", "sea"], d: ["d", "dee"], e: ["e"],
-    f: ["f"], g: ["g", "gee"], h: ["h"], i: ["i", "eye"], j: ["j", "jay"], k: ["k", "kay", "okay"],
-    l: ["l", "el", "elle"], m: ["m", "em"], n: ["n", "en"], o: ["o", "oh"], p: ["p", "pee", "pea"],
-    q: ["q", "queue", "cue"], r: ["r", "are", "our"], s: ["s", "yes"], t: ["t", "tea", "tee"], u: ["u", "you"],
-    v: ["v"], w: ["w"], x: ["x", "ex"], y: ["y", "why"], z: ["z", "zee", "zed"],
+    a: ["a", "ay", "hey", "aye", "eh"], b: ["b", "bee", "be"], c: ["c", "see", "sea"], d: ["d", "dee"],
+    e: ["e", "ee", "he", "me"], f: ["f", "eff", "ef", "if"], g: ["g", "gee", "jee", "ji"], h: ["h", "age", "each"],
+    i: ["i", "eye", "hi"], j: ["j", "jay"], k: ["k", "kay", "okay"], l: ["l", "el", "elle", "ell", "yell", "all"],
+    m: ["m", "em"], n: ["n", "en"], o: ["o", "oh", "owe", "ow"], p: ["p", "pee", "pea"], q: ["q", "queue", "cue", "kew"],
+    r: ["r", "are", "our", "ar", "ah", "aw", "or"], s: ["s", "yes", "ess", "es", "is"], t: ["t", "tea", "tee"],
+    u: ["u", "you", "yoo", "who", "ewe"], v: ["v", "vee", "fee"], w: ["w", "double you", "double", "dub you"],
+    x: ["x", "ex", "eggs", "ax", "axe"], y: ["y", "why", "wye", "wise"], z: ["z", "zee", "zed", "ze"],
   };
   const ONES = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+  // Kid ways of saying 1-9 (also used inside "twenty free" and friends).
+  const ONES_KID = [["won"], ["to", "too"], ["free", "tree"], ["for"], ["fife"], ["sick", "thick"], ["heaven"], ["ate"], []];
+  const OTHER_KID = { 11: ["leaven"], 30: ["dirty", "thirsty"] };
   const TEENS = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
 
   function numberPhrases(n) {
-    if (n < 10) return [ONES[n - 1]];
-    if (n < 20) return [TEENS[n - 10]];
+    const ones = (d) => [ONES[d - 1], ...ONES_KID[d - 1]];
+    const extra = OTHER_KID[n] || [];
+    if (n < 10) return ones(n);
+    if (n < 20) return [TEENS[n - 10], ...extra];
     if (n === 20) return ["twenty"];
-    if (n === 30) return ["thirty"];
-    return [`twenty ${ONES[n - 21]}`];
+    if (n === 30) return ["thirty", ...extra];
+    return ones(n - 20).map((w) => `twenty ${w}`);
   }
 
   // phrase -> answer key ("b" for the letter B/b, "17" for seventeen)
@@ -43,8 +51,12 @@
     return out;
   }
 
+  // Two listeners hear the mic slowed a little (x0.8 and x0.9), which makes a small child's high voice sound
+  // more like the grown-up voices the model learned from. Picked from 11 rounds of kid-voice testing.
+  const VOICE_STRETCH = [0.8, 0.9];
+
   let model = null;
-  let recognizer = null;
+  let recognizers = [];
   let loading = null;
   let ctx = null;
   let stream = null;
@@ -52,6 +64,7 @@
   let node = null;
   let listeners = [];
   let level = 0;
+  let gainEnv = 0;
 
   const emit = (msg) => listeners.forEach((fn) => fn(msg));
 
@@ -133,10 +146,14 @@
   }
 
   function makeRecognizer() {
-    if (recognizer) { try { recognizer.remove(); } catch (e) {} }
-    recognizer = new model.KaldiRecognizer(ctx.sampleRate, GRAMMAR);
-    recognizer.on("result", (m) => emit({ type: "final", text: m.result.text || "" }));
-    recognizer.on("partialresult", (m) => emit({ type: "partial", text: m.result.partial || "" }));
+    for (const r of recognizers) { try { r.rec.remove(); } catch (e) {} }
+    recognizers = VOICE_STRETCH.map((stretch, src) => {
+      const rate = ctx.sampleRate * stretch;
+      const rec = new model.KaldiRecognizer(rate, GRAMMAR);
+      rec.on("result", (m) => emit({ type: "final", text: m.result.text || "", src }));
+      rec.on("partialresult", (m) => emit({ type: "partial", text: m.result.partial || "", src }));
+      return { rec, rate };
+    });
   }
 
   // Must be called from a tap so iPad Safari allows the microphone and audio.
@@ -162,13 +179,22 @@
         let sum = 0;
         for (let i = 0; i < data.length; i += 8) sum += data[i] * data[i];
         level = Math.min(1, Math.sqrt(sum / (data.length / 8)) * 6);
-        if (recognizer) { try { recognizer.acceptWaveform(e.inputBuffer); } catch (err) {} }
+        // Quiet little voices get turned up: follow the loudest recent sound and boost toward it (at most 4x).
+        let peak = 0;
+        for (let i = 0; i < data.length; i++) { const v = Math.abs(data[i]); if (v > peak) peak = v; }
+        gainEnv = Math.max(peak, gainEnv * 0.97);
+        const gain = Math.min(4, 0.7 / Math.max(gainEnv, 1e-3));
+        const boosted = new Float32Array(data.length);
+        for (let i = 0; i < data.length; i++) boosted[i] = data[i] * gain;
+        for (const r of recognizers) {
+          try { r.rec.acceptWaveformFloat(boosted, r.rate); } catch (err) {}
+        }
       };
       node.connect(ctx.destination);
     }
     source.disconnect();
     source.connect(node);
-    if (model && !recognizer) makeRecognizer();
+    if (model && !recognizers.length) makeRecognizer();
     return true;
   }
 
@@ -198,6 +224,7 @@
     level: () => level,
     audioContext: () => ctx,
     on: (fn) => { listeners.push(fn); },
+    listeners: VOICE_STRETCH.length,
     GRAMMAR,
   };
 })();
