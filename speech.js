@@ -84,11 +84,22 @@
     });
   }
 
+  // On the very first visit the service worker isn't in charge yet, so the model download would skip its
+  // cache and the game wouldn't work offline until the next launch. Wait briefly for it to take over.
+  async function waitForServiceWorker() {
+    if (!("serviceWorker" in navigator) || location.protocol === "file:" || navigator.serviceWorker.controller) return;
+    await Promise.race([
+      new Promise((resolve) => navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true })),
+      new Promise((resolve) => setTimeout(resolve, 8000)),
+    ]);
+  }
+
   function load(onProgress = () => {}) {
     if (loading) return loading;
     loading = (async () => {
       if (!window.Vosk) throw new Error("Speech engine missing");
       onProgress(0.01);
+      await waitForServiceWorker();
       const blob = await fetchWithProgress(MODEL_URL, onProgress);
       await deleteOldModelCopy();
       onProgress(0.92);

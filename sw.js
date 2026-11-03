@@ -47,7 +47,7 @@ self.addEventListener("fetch", (event) => {
       const hit = await c.match(req);
       if (hit) return hit;
       const res = await fetch(req);
-      if (res.ok) c.put(req, res.clone());
+      if (res.ok) event.waitUntil(c.put(req, res.clone()));
       return res;
     }));
     return;
