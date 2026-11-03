@@ -4,10 +4,10 @@
   const TOTAL = 50;
   const TIME_LIMIT_SECONDS = 5 * 60;
   const MAX_TRIES = 3;
-  const MAX_NUMBER = 30;
+  const MAX_NUMBER = 19;
   const HISTORY_LIMIT = 200;
   const MONKEYS = ["A", "B", "C"];
-  // 16 big letters + 16 little letters + 18 numbers, picked fresh from all 82 each round.
+  // 16 big letters + 16 little letters + 18 numbers, picked fresh from all 71 each round.
   const MIX = { upper: 16, lower: 16, number: 18 };
 
   const KEYS = {
@@ -31,7 +31,7 @@
     splash: $("splash"), splashMonkey: $("splash-monkey"), splashFx: $("splash-fx"),
     mute: $("mute"), startForm: $("start-form"), name: $("name"), resume: $("resume"), ears: $("ears"), earsText: $("ears-text"),
     openScores: $("open-scores"), playerName: $("player-name"), count: $("count"), progressBar: $("progress-bar"), timer: $("timer"),
-    card: $("card"), item: $("item"), itemHint: $("item-hint"), tries: $("tries"), cheer: $("cheer"), mic: $("mic"), listenText: $("listen-text"),
+    card: $("card"), item: $("item"), itemHint: $("item-hint"), tries: $("tries"), cheer: $("cheer"), mic: $("mic"), micCap: $("mic-cap"), listenText: $("listen-text"),
     grownup: $("grownup"), guRight: $("gu-right"), guWrong: $("gu-wrong"), skip: $("skip"), quit: $("quit"),
     overlay: $("overlay"), overlayTitle: $("overlay-title"), overlayText: $("overlay-text"), overlayBar: $("overlay-bar"),
     overlayGo: $("overlay-go"), overlayAlt: $("overlay-alt"),
@@ -154,6 +154,7 @@
   let state = null;
   let timerHandle = null;
   let overlayMode = null;
+  let micPaused = false;
   let busy = false;
   let shownAt = 0;
 
@@ -176,7 +177,7 @@
     saveGame();
   }
   function resumeClock() {
-    if (!state || !state.playing || state.runningSince || document.hidden || overlayMode || !el.timesup.hidden || !el.restartAsk.hidden) return;
+    if (!state || !state.playing || state.runningSince || document.hidden || overlayMode || micPaused || !el.timesup.hidden || !el.restartAsk.hidden) return;
     state.runningSince = Date.now();
   }
 
@@ -198,6 +199,7 @@
     el.timesup.hidden = true;
     el.restartAsk.hidden = true;
     el.grownup.hidden = !state.grownup;
+    setMicPaused(false);
     show("game");
     renderItem();
     tick();
@@ -210,6 +212,7 @@
   // Get the mic and model going before the clock starts. Must run inside a tap on iPad.
   async function connectEars() {
     if (!state || !state.playing) return;
+    setMicPaused(false);
     if (state.grownup) { hideOverlay(); maybeBegin(); return; }
     showOverlay("loading");
     try {
@@ -237,12 +240,22 @@
     state.grownup = true;
     if (speech) speech.stopMic();
     el.grownup.hidden = false;
+    setMicPaused(false);
     hideOverlay();
     renderItem();
     saveGame();
   }
 
   // ---------- Overlays ----------
+  // While any pop-up is showing, the game behind it (Skip, Restart, I'm done) can't be tapped or tabbed to.
+  const popups = [el.overlay, el.timesup, el.restartAsk];
+  function syncInert() {
+    const open = popups.some((p) => !p.hidden);
+    [...el.restartAsk.parentElement.children].forEach((c) => { if (!popups.includes(c)) c.inert = open; });
+  }
+  const popupWatch = new MutationObserver(syncInert);
+  popups.forEach((p) => popupWatch.observe(p, { attributes: true, attributeFilter: ["hidden"] }));
+
   function showOverlay(mode) {
     overlayMode = mode;
     pauseClock();
@@ -344,7 +357,7 @@
     }
     const lvl = speech && !state.grownup ? speech.level() : 0;
     el.mic.style.setProperty("--lvl", lvl.toFixed(2));
-    el.mic.classList.toggle("live", Boolean(speech && speech.micRunning() && !state.grownup && !overlayMode));
+    el.mic.classList.toggle("live", Boolean(speech && speech.micRunning() && !state.grownup && !overlayMode && !micPaused));
   }
 
   // ---------- Answers ----------
@@ -426,16 +439,58 @@
     }
   }
 
-  const blocked = () => busy || overlayMode || !el.timesup.hidden || !el.restartAsk.hidden;
+  // ---------- Mic pause ----------
+  // Tapping the mic turns it fully off (the iPad's mic light goes out) and stops the clock until it's tapped again.
+  function renderMicButton() {
+    el.mic.classList.toggle("paused", micPaused);
+    el.mic.disabled = Boolean(state && state.grownup);
+    el.mic.setAttribute("aria-pressed", String(micPaused));
+    el.mic.setAttribute("aria-label", micPaused ? "Microphone paused. Tap to turn it back on." : "Microphone on. Tap to pause.");
+    el.micCap.textContent = micPaused ? "Paused" : "Pause";
+    el.card.classList.toggle("mic-off", micPaused);
+    if (state && state.playing && !busy) el.skip.disabled = micPaused;
+  }
+  function setMicPaused(on) {
+    micPaused = on;
+    renderMicButton();
+  }
+  async function toggleMic() {
+    if (!state || !state.playing || state.grownup || busy || overlayMode || !el.timesup.hidden || !el.restartAsk.hidden) return;
+    if (!micPaused) {
+      setMicPaused(true);
+      pauseClock();
+      speech.stopMic();
+      el.listenText.textContent = "Mic paused. Tap the mic when you're ready!";
+      return;
+    }
+    try {
+      await speech.startMic();
+    } catch (e) {
+      showSpeechProblem(e && (e.name === "NotAllowedError" || e.name === "SecurityError") ? "denied" : "nomic");
+      return;
+    }
+    if (!state || !state.playing || !micPaused) return;
+    setMicPaused(false);
+    speech.reset();
+    renderItem();
+    resumeClock();
+  }
+  el.mic.addEventListener("click", toggleMic);
+
+  const blocked = () => busy || overlayMode || micPaused || !el.timesup.hidden || !el.restartAsk.hidden;
   function canListen() { return state && state.playing && !blocked() && !state.grownup; }
 
+  // Each listener gets a say: a "not yet" only counts once every listener heard something else.
+  const wrongFrom = new Set();
+  let wrongCard = -1;
   function handleSpeech(msg) {
     if (!canListen()) return;
     const it = current();
+    if (wrongCard !== shownAt) { wrongFrom.clear(); wrongCard = shownAt; }
     const keys = speech.parse(msg.text);
     if (msg.type === "partial") {
-      // Early yes as soon as the right word shows up ("twenty" waits, in case it's "twenty one").
-      if (keys.includes(it.key) && it.key !== "20") mark("right", it.key);
+      // Early yes as soon as the right word shows up.
+      if (keys.includes(it.key)) mark("right", it.key);
       return;
     }
     if (Date.now() - shownAt < 350) return;
@@ -443,8 +498,11 @@
       if (msg.text && msg.text.trim()) el.listenText.textContent = "Hmm, I didn't catch that. Say it again!";
       return;
     }
-    if (keys.includes(it.key)) mark("right", it.key);
-    else mark("wrong", keys[keys.length - 1]);
+    if (keys.includes(it.key)) { mark("right", it.key); return; }
+    wrongFrom.add(msg.src || 0);
+    if (wrongFrom.size < (speech.listeners || 1)) return;
+    wrongFrom.clear();
+    mark("wrong", keys[keys.length - 1]);
   }
   if (speech) speech.on(handleSpeech);
 
@@ -497,7 +555,9 @@
     busy = false;
     el.timesup.hidden = true;
     el.overlay.hidden = true;
+    el.restartAsk.hidden = true;
     overlayMode = null;
+    setMicPaused(false);
     if (speech) speech.stopMic();
     state.results.forEach((r) => { if (!r.status) r.status = "missed"; });
     const used = Math.round(elapsedMs() / 1000);
@@ -546,9 +606,19 @@
   });
   el.print.addEventListener("click", () => window.print());
 
+  // Rounds saved before an update may hold cards the game no longer has (numbers 20-30); drop them.
+  function savedGame() {
+    const saved = store.get(KEYS.game);
+    if (!saved) return null;
+    const fits = Array.isArray(saved.items) && saved.items.every((it) => it.kind !== "number" || Number(it.key) <= MAX_NUMBER);
+    if (fits) return saved;
+    store.remove(KEYS.game);
+    return null;
+  }
+
   function renderStart() {
     el.name.value = store.get(KEYS.name, "") || "";
-    const saved = store.get(KEYS.game);
+    const saved = savedGame();
     el.resume.hidden = !saved;
     if (saved) el.resume.textContent = `Keep going, ${saved.name}! (${saved.results.filter((r) => r.status).length} of ${TOTAL} done)`;
   }
@@ -560,7 +630,7 @@
     startGame(name);
   });
   el.resume.addEventListener("click", () => {
-    const saved = store.get(KEYS.game);
+    const saved = savedGame();
     if (saved) playGame(saved);
   });
 

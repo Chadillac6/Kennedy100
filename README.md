@@ -4,7 +4,7 @@ A 5-minute speaking game for young kids. Banana Monkey shows a big letter, a lit
 
 ## How a round works
 
-- **50 cards** picked fresh each round from all 82: big letters A–Z, little letters a–z and numbers 1–30 (16 big, 16 little, 18 numbers). The same letter never shows twice in a row.
+- **50 cards** picked fresh each round from all 71: big letters A–Z, little letters a–z and numbers 1–19 (16 big, 16 little, 18 numbers). The same letter never shows twice in a row.
 - **5 minutes** on the clock. When time's up the child can keep going; anything answered after the bell gets a clock mark and doesn't count toward the score.
 - **Letter names**, not letter sounds: "bee" for B. Same-sounding words count too ("see" for C, "you" for U, "zed" for Z). Big and little letters sound the same, so the card's case is shown but only the letter name is checked.
 - **3 tries per card**, shown as three bananas. After 3 wrong tries the card counts as missed and the game moves on.
@@ -14,7 +14,7 @@ A 5-minute speaking game for young kids. Banana Monkey shows a big letter, a lit
 
 ## How the listening works
 
-Speech recognition runs **inside the page, offline**, using [Vosk](https://alphacephei.com/vosk/) compiled to WebAssembly ([vosk-browser](https://github.com/ccoreilly/vosk-browser)). The recognizer only listens for the game's answers (letter names and the numbers 1–30), which keeps it fast and accurate. Audio never leaves the iPad.
+Speech recognition runs **inside the page, offline**, using [Vosk](https://alphacephei.com/vosk/) compiled to WebAssembly ([vosk-browser](https://github.com/ccoreilly/vosk-browser)). The recognizer only listens for the game's answers (letter names and the numbers 1–19), which keeps it fast and accurate. Audio never leaves the iPad.
 
 - The speech model is about 40 MB and downloads the first time the app opens. After that it's stored on the iPad and the game works with no Wi‑Fi.
 - The iPad asks for microphone permission when the first round starts.
