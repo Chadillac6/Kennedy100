@@ -31,7 +31,7 @@
     splash: $("splash"), splashMonkey: $("splash-monkey"), splashFx: $("splash-fx"),
     mute: $("mute"), startForm: $("start-form"), name: $("name"), resume: $("resume"), ears: $("ears"), earsText: $("ears-text"),
     openScores: $("open-scores"), playerName: $("player-name"), count: $("count"), progressBar: $("progress-bar"), timer: $("timer"),
-    card: $("card"), item: $("item"), itemHint: $("item-hint"), tries: $("tries"), cheer: $("cheer"), mic: $("mic"), listenText: $("listen-text"),
+    card: $("card"), item: $("item"), itemHint: $("item-hint"), tries: $("tries"), cheer: $("cheer"), mic: $("mic"), micCap: $("mic-cap"), listenText: $("listen-text"),
     grownup: $("grownup"), guRight: $("gu-right"), guWrong: $("gu-wrong"), skip: $("skip"), quit: $("quit"),
     overlay: $("overlay"), overlayTitle: $("overlay-title"), overlayText: $("overlay-text"), overlayBar: $("overlay-bar"),
     overlayGo: $("overlay-go"), overlayAlt: $("overlay-alt"),
@@ -154,6 +154,7 @@
   let state = null;
   let timerHandle = null;
   let overlayMode = null;
+  let micPaused = false;
   let busy = false;
   let shownAt = 0;
 
@@ -176,7 +177,7 @@
     saveGame();
   }
   function resumeClock() {
-    if (!state || !state.playing || state.runningSince || document.hidden || overlayMode || !el.timesup.hidden || !el.restartAsk.hidden) return;
+    if (!state || !state.playing || state.runningSince || document.hidden || overlayMode || micPaused || !el.timesup.hidden || !el.restartAsk.hidden) return;
     state.runningSince = Date.now();
   }
 
@@ -198,6 +199,7 @@
     el.timesup.hidden = true;
     el.restartAsk.hidden = true;
     el.grownup.hidden = !state.grownup;
+    setMicPaused(false);
     show("game");
     renderItem();
     tick();
@@ -210,6 +212,7 @@
   // Get the mic and model going before the clock starts. Must run inside a tap on iPad.
   async function connectEars() {
     if (!state || !state.playing) return;
+    setMicPaused(false);
     if (state.grownup) { hideOverlay(); maybeBegin(); return; }
     showOverlay("loading");
     try {
@@ -237,6 +240,7 @@
     state.grownup = true;
     if (speech) speech.stopMic();
     el.grownup.hidden = false;
+    renderMicButton();
     hideOverlay();
     renderItem();
     saveGame();
@@ -353,7 +357,7 @@
     }
     const lvl = speech && !state.grownup ? speech.level() : 0;
     el.mic.style.setProperty("--lvl", lvl.toFixed(2));
-    el.mic.classList.toggle("live", Boolean(speech && speech.micRunning() && !state.grownup && !overlayMode));
+    el.mic.classList.toggle("live", Boolean(speech && speech.micRunning() && !state.grownup && !overlayMode && !micPaused));
   }
 
   // ---------- Answers ----------
@@ -435,7 +439,45 @@
     }
   }
 
-  const blocked = () => busy || overlayMode || !el.timesup.hidden || !el.restartAsk.hidden;
+  // ---------- Mic pause ----------
+  // Tapping the mic turns it fully off (the iPad's mic light goes out) and stops the clock until it's tapped again.
+  function renderMicButton() {
+    el.mic.classList.toggle("paused", micPaused);
+    el.mic.disabled = Boolean(state && state.grownup);
+    el.mic.setAttribute("aria-pressed", String(micPaused));
+    el.mic.setAttribute("aria-label", micPaused ? "Microphone paused. Tap to turn it back on." : "Microphone on. Tap to pause.");
+    el.micCap.textContent = micPaused ? "Paused" : "Pause";
+    el.card.classList.toggle("mic-off", micPaused);
+    if (state && state.playing && !busy) el.skip.disabled = micPaused;
+  }
+  function setMicPaused(on) {
+    micPaused = on;
+    renderMicButton();
+  }
+  async function toggleMic() {
+    if (!state || !state.playing || state.grownup || busy || overlayMode || !el.timesup.hidden || !el.restartAsk.hidden) return;
+    if (!micPaused) {
+      setMicPaused(true);
+      pauseClock();
+      speech.stopMic();
+      el.listenText.textContent = "Mic paused. Tap the mic when you're ready!";
+      return;
+    }
+    try {
+      await speech.startMic();
+    } catch (e) {
+      showSpeechProblem(e && (e.name === "NotAllowedError" || e.name === "SecurityError") ? "denied" : "nomic");
+      return;
+    }
+    if (!state || !state.playing || !micPaused) return;
+    setMicPaused(false);
+    speech.reset();
+    renderItem();
+    resumeClock();
+  }
+  el.mic.addEventListener("click", toggleMic);
+
+  const blocked = () => busy || overlayMode || micPaused || !el.timesup.hidden || !el.restartAsk.hidden;
   function canListen() { return state && state.playing && !blocked() && !state.grownup; }
 
   function handleSpeech(msg) {
@@ -508,6 +550,7 @@
     el.overlay.hidden = true;
     el.restartAsk.hidden = true;
     overlayMode = null;
+    setMicPaused(false);
     if (speech) speech.stopMic();
     state.results.forEach((r) => { if (!r.status) r.status = "missed"; });
     const used = Math.round(elapsedMs() / 1000);

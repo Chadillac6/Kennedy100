@@ -171,9 +171,19 @@ input[type="text"] { width: 100%; font: inherit; font-size: 1.5rem; padding: 12p
 .tries { position: absolute; top: 14px; right: 18px; font-size: 1.5rem; letter-spacing: 2px; }
 .tries span.used { filter: grayscale(1); opacity: 0.3; }
 
-.listen-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 14px 0 4px; }
+.listen-row { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 14px 0 18px; }
 .mic { --lvl: 0; position: relative; width: 74px; height: 74px; border-radius: 50%; background: #e9e4dc; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+.mic { border: 0; padding: 0; font-family: inherit; cursor: pointer; touch-action: manipulation; flex: none; }
+.mic:focus-visible { outline: 4px solid var(--banana-dark); outline-offset: 6px; }
+.mic:disabled { cursor: default; }
 .mic.live { background: var(--leaf); }
+.mic-cap { position: absolute; left: 50%; bottom: -14px; translate: -50% 0; background: #fff; color: var(--soft); border-radius: 999px; padding: 1px 10px; font-size: 0.85rem; font-weight: 800; box-shadow: 0 2px 0 rgba(31, 122, 67, 0.18); white-space: nowrap; }
+.mic:disabled .mic-cap { display: none; }
+.mic.paused { background: #f6d2cd; }
+.mic.paused .mic-icon { filter: grayscale(1); opacity: 0.55; }
+.mic.paused::after { content: ""; position: absolute; width: 58px; height: 6px; border-radius: 3px; background: #d9534f; rotate: -45deg; }
+.mic.paused .mic-cap { background: #d9534f; color: #fff; }
+.problem-card.mic-off .item { opacity: 0.35; }
 .mic-ring { position: absolute; inset: -8px; border-radius: 50%; border: 6px solid var(--leaf); opacity: 0; transform: scale(calc(1 + var(--lvl) * 0.35)); transition: transform 0.1s; }
 .mic.live .mic-ring { opacity: 0.45; }
 .listen-text { font-size: 1.6rem; font-weight: 700; margin: 0; min-height: 2.6rem; }
