@@ -240,7 +240,7 @@
     state.grownup = true;
     if (speech) speech.stopMic();
     el.grownup.hidden = false;
-    renderMicButton();
+    setMicPaused(false);
     hideOverlay();
     renderItem();
     saveGame();
