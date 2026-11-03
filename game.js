@@ -243,6 +243,15 @@
   }
 
   // ---------- Overlays ----------
+  // While any pop-up is showing, the game behind it (Skip, Restart, I'm done) can't be tapped or tabbed to.
+  const popups = [el.overlay, el.timesup, el.restartAsk];
+  function syncInert() {
+    const open = popups.some((p) => !p.hidden);
+    [...el.restartAsk.parentElement.children].forEach((c) => { if (!popups.includes(c)) c.inert = open; });
+  }
+  const popupWatch = new MutationObserver(syncInert);
+  popups.forEach((p) => popupWatch.observe(p, { attributes: true, attributeFilter: ["hidden"] }));
+
   function showOverlay(mode) {
     overlayMode = mode;
     pauseClock();
@@ -497,6 +506,7 @@
     busy = false;
     el.timesup.hidden = true;
     el.overlay.hidden = true;
+    el.restartAsk.hidden = true;
     overlayMode = null;
     if (speech) speech.stopMic();
     state.results.forEach((r) => { if (!r.status) r.status = "missed"; });
