@@ -67,6 +67,11 @@ input { -webkit-user-select: text; user-select: text; }
 .btn.ghost { background: transparent; color: var(--soft); }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .big-btn { width: 100%; font-size: 1.5rem; padding: 16px; margin-top: 12px; }
+.mode-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.mode-btns .big-btn { margin-top: 0; }
+.mode-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 10px; }
+.mode-name { font-size: 1.4rem; font-weight: 800; white-space: nowrap; }
+.mode-sub { font-size: 1rem; font-weight: 600; opacity: 0.85; }
 .link-btn { font: inherit; font-weight: 700; font-size: 1.15rem; background: none; border: 0; color: var(--leaf-dark); cursor: pointer; padding: 8px 12px; }
 
 .mute { position: fixed; top: calc(var(--safe-top) + 12px); right: 14px; z-index: 40; width: 52px; height: 52px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, 0.9); box-shadow: var(--shadow); font-size: 1.5rem; cursor: pointer; }

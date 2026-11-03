@@ -4,6 +4,7 @@ A 5-minute speaking game for young kids. Banana Monkey shows a big letter, a lit
 
 ## How a round works
 
+- **Two games** on the start screen: **Kennedy 100** (50 cards, 5 minutes) and **Kenny 25** (25 cards, 2½ minutes: 8 big, 8 little, 9 numbers).
 - **50 cards** picked fresh each round from all 71: big letters A–Z, little letters a–z and numbers 1–19 (16 big, 16 little, 18 numbers). The same letter never shows twice in a row.
 - **5 minutes** on the clock. When time's up the child can keep going; anything answered after the bell gets a clock mark and doesn't count toward the score.
 - **Letter names**, not letter sounds: "bee" for B. Same-sounding words count too ("see" for C, "you" for U, "zed" for Z). Big and little letters sound the same, so the card's case is shown but only the letter name is checked.
