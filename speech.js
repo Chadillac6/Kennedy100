@@ -99,7 +99,8 @@
     return new Promise((resolve, reject) => {
       const m = new window.Vosk.Model(url, -1);
       const fail = (msg) => {
-        try { m.terminate(); } catch (e) {}
+        // Hard-stop the worker so its half-open copy of the model can't block the next try.
+        try { m.worker.terminate(); } catch (e) {}
         reject(new Error((msg && msg.error) || "Speech model failed to load"));
       };
       m.on("load", (msg) => (msg.result ? resolve(m) : fail(msg)));
