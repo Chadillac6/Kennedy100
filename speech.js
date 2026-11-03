@@ -1,6 +1,6 @@
 // Offline speech recognition for Kennedy 100.
 // Vosk (WebAssembly) runs in a worker and listens only for the answers the game can accept
-// (letter names and the numbers 1 to 30), which keeps it small, fast and private: audio never leaves the iPad.
+// (letter names and the numbers 1 to 19), which keeps it small, fast and private: audio never leaves the iPad.
 (() => {
   "use strict";
 
@@ -18,28 +18,26 @@
     x: ["x", "ex", "eggs", "ax", "axe"], y: ["y", "why", "wye", "wise"], z: ["z", "zee", "zed", "ze"],
   };
   const ONES = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
-  // Kid ways of saying 1-9 (also used inside "twenty free" and friends).
+  // Kid ways of saying 1-9.
   const ONES_KID = [["won"], ["to", "too"], ["free", "tree"], ["for"], ["fife"], ["sick", "thick"], ["heaven"], ["ate"], []];
-  const OTHER_KID = { 11: ["leaven"], 30: ["dirty", "thirsty"] };
+  const OTHER_KID = { 11: ["leaven"] };
+  const MAX_NUMBER = 19;
   const TEENS = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
 
   function numberPhrases(n) {
     const ones = (d) => [ONES[d - 1], ...ONES_KID[d - 1]];
     const extra = OTHER_KID[n] || [];
     if (n < 10) return ones(n);
-    if (n < 20) return [TEENS[n - 10], ...extra];
-    if (n === 20) return ["twenty"];
-    if (n === 30) return ["thirty", ...extra];
-    return ones(n - 20).map((w) => `twenty ${w}`);
+    return [TEENS[n - 10], ...extra];
   }
 
   // phrase -> answer key ("b" for the letter B/b, "17" for seventeen)
   const PHRASES = new Map();
   for (const [letter, words] of Object.entries(LETTER_WORDS)) for (const w of words) PHRASES.set(w, letter);
-  for (let n = 1; n <= 30; n++) for (const p of numberPhrases(n)) PHRASES.set(p, String(n));
+  for (let n = 1; n <= MAX_NUMBER; n++) for (const p of numberPhrases(n)) PHRASES.set(p, String(n));
   const GRAMMAR = JSON.stringify([...PHRASES.keys(), "[unk]"]);
 
-  // Turns recognizer text like "twenty one" or "bee bee" into answer keys: ["21"] or ["b", "b"].
+  // Turns recognizer text like "seventeen" or "bee bee" into answer keys: ["17"] or ["b", "b"].
   function parse(text) {
     const words = String(text || "").toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
     const out = [];

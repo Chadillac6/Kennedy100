@@ -1,7 +1,7 @@
 // Bump VERSION on every release so iPads pick up the new files on their next launch.
 // The speech model has its own cache so app updates don't re-download 40 MB.
 const CACHE_PREFIX = "kennedy100-";
-const VERSION = `${CACHE_PREFIX}v3`;
+const VERSION = `${CACHE_PREFIX}v4`;
 const MODEL_CACHE = `${CACHE_PREFIX}model-small-en-us-0.15`;
 const MODEL_URL = "model/vosk-model-small-en-us-0.15.tar.gz";
 const ASSETS = [

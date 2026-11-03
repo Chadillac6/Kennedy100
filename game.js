@@ -4,10 +4,10 @@
   const TOTAL = 50;
   const TIME_LIMIT_SECONDS = 5 * 60;
   const MAX_TRIES = 3;
-  const MAX_NUMBER = 30;
+  const MAX_NUMBER = 19;
   const HISTORY_LIMIT = 200;
   const MONKEYS = ["A", "B", "C"];
-  // 16 big letters + 16 little letters + 18 numbers, picked fresh from all 82 each round.
+  // 16 big letters + 16 little letters + 18 numbers, picked fresh from all 71 each round.
   const MIX = { upper: 16, lower: 16, number: 18 };
 
   const KEYS = {
@@ -489,8 +489,8 @@
     if (wrongCard !== shownAt) { wrongFrom.clear(); wrongCard = shownAt; }
     const keys = speech.parse(msg.text);
     if (msg.type === "partial") {
-      // Early yes as soon as the right word shows up ("twenty" waits, in case it's "twenty one").
-      if (keys.includes(it.key) && it.key !== "20") mark("right", it.key);
+      // Early yes as soon as the right word shows up.
+      if (keys.includes(it.key)) mark("right", it.key);
       return;
     }
     if (Date.now() - shownAt < 350) return;
