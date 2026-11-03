@@ -606,9 +606,19 @@
   });
   el.print.addEventListener("click", () => window.print());
 
+  // Rounds saved before an update may hold cards the game no longer has (numbers 20-30); drop them.
+  function savedGame() {
+    const saved = store.get(KEYS.game);
+    if (!saved) return null;
+    const fits = Array.isArray(saved.items) && saved.items.every((it) => it.kind !== "number" || Number(it.key) <= MAX_NUMBER);
+    if (fits) return saved;
+    store.remove(KEYS.game);
+    return null;
+  }
+
   function renderStart() {
     el.name.value = store.get(KEYS.name, "") || "";
-    const saved = store.get(KEYS.game);
+    const saved = savedGame();
     el.resume.hidden = !saved;
     if (saved) el.resume.textContent = `Keep going, ${saved.name}! (${saved.results.filter((r) => r.status).length} of ${TOTAL} done)`;
   }
@@ -620,7 +630,7 @@
     startGame(name);
   });
   el.resume.addEventListener("click", () => {
-    const saved = store.get(KEYS.game);
+    const saved = savedGame();
     if (saved) playGame(saved);
   });
 
