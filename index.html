@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Kennedy 100: Letters and Numbers with Banana Monkey</title>
-  <meta name="description" content="Say each letter and number out loud. 50 in 5 minutes with Banana Monkey.">
+  <meta name="description" content="Say each letter and number out loud. 50 in 5 minutes (or 25 in 2½) with Banana Monkey.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" sizes="180x180">
@@ -80,13 +80,16 @@
         <h1 id="start-title">Kennedy <span class="hundred">100</span></h1>
         <ul class="rules">
           <li><span class="rule-icon">🗣️</span> Say each letter or number out loud</li>
-          <li><span class="rule-icon">🍌</span> 50 to do, 5 minutes on the clock</li>
+          <li><span class="rule-icon">🍌</span> Pick a game: 50 cards in 5 minutes, or 25 in 2½</li>
           <li><span class="rule-icon">🔁</span> 3 tries each. Tap <strong>Skip</strong> to save one for the end</li>
         </ul>
         <form id="start-form" autocomplete="off">
           <label for="name">What's your name?</label>
           <input id="name" name="name" type="text" maxlength="20" placeholder="Your name" autocapitalize="words" spellcheck="false" required>
-          <button type="submit" class="btn primary big-btn">Let's go! 🐒</button>
+          <div class="mode-btns">
+            <button type="submit" name="mode" value="k100" class="btn primary big-btn mode-btn"><span class="mode-name">Kennedy 100</span><span class="mode-sub">50 cards · 5:00</span></button>
+            <button type="submit" name="mode" value="k25" class="btn secondary big-btn mode-btn"><span class="mode-name">Kenny 25</span><span class="mode-sub">25 cards · 2:30</span></button>
+          </div>
         </form>
         <button id="resume" type="button" class="btn secondary big-btn" hidden>Keep going from where I stopped</button>
         <p id="ears" class="ears" role="status" aria-live="polite"><span class="ears-dot"></span><span id="ears-text">Getting Banana Monkey's ears ready…</span></p>
@@ -102,7 +105,7 @@
     <div class="topbar">
       <div class="who"><span class="who-label">Player</span><span id="player-name"></span></div>
       <div class="progress-wrap">
-        <div class="progress-text"><span id="count">1</span> of 50</div>
+        <div class="progress-text"><span id="count">1</span> of <span id="of-total">50</span></div>
         <div class="progress" aria-hidden="true"><div id="progress-bar"></div></div>
       </div>
       <div class="bar-right">
@@ -167,7 +170,7 @@
       <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="restart-title">
         <div class="monkey" data-pose="down"></div>
         <h2 id="restart-title">Start over?</h2>
-        <p>You'll get 50 new cards and the clock goes back to 5:00. This game won't be saved.</p>
+        <p>You'll get <span id="restart-total">50</span> new cards and the clock goes back to <span id="restart-time">5:00</span>. This game won't be saved.</p>
         <div class="overlay-btns">
           <button id="restart-no" type="button" class="btn primary">No, keep playing</button>
           <button id="restart-yes" type="button" class="btn secondary">Yes, start over</button>
@@ -193,7 +196,7 @@
           <div id="practice" class="practice"></div>
         </section>
         <section>
-          <h2>All 50</h2>
+          <h2>All <span id="all-total">50</span></h2>
           <div id="grid" class="grid"></div>
           <p class="legend"><span class="cell right">A</span> got it <span class="cell missed">A</span> missed <span class="cell late">A</span> after the bell</p>
         </section>

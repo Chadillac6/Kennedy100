@@ -1,14 +1,16 @@
 (() => {
   "use strict";
 
-  const TOTAL = 50;
-  const TIME_LIMIT_SECONDS = 5 * 60;
   const MAX_TRIES = 3;
   const MAX_NUMBER = 19;
   const HISTORY_LIMIT = 200;
   const MONKEYS = ["A", "B", "C"];
-  // 16 big letters + 16 little letters + 18 numbers, picked fresh from all 71 each round.
-  const MIX = { upper: 16, lower: 16, number: 18 };
+  // Cards are picked fresh from all 71 (A-Z, a-z, 1-19) each round.
+  const MODES = {
+    k100: { label: "Kennedy 100", total: 50, seconds: 5 * 60, mix: { upper: 16, lower: 16, number: 18 } },
+    k25: { label: "Kenny 25", total: 25, seconds: 150, mix: { upper: 8, lower: 8, number: 9 } },
+  };
+  const modeOf = (key) => MODES[key] || MODES.k100;
 
   const KEYS = {
     name: "kennedy100.name",
@@ -29,6 +31,7 @@
   const $ = (id) => document.getElementById(id);
   const el = {
     splash: $("splash"), splashMonkey: $("splash-monkey"), splashFx: $("splash-fx"),
+    ofTotal: $("of-total"), restartTotal: $("restart-total"), restartTime: $("restart-time"), allTotal: $("all-total"),
     mute: $("mute"), startForm: $("start-form"), name: $("name"), resume: $("resume"), ears: $("ears"), earsText: $("ears-text"),
     openScores: $("open-scores"), playerName: $("player-name"), count: $("count"), progressBar: $("progress-bar"), timer: $("timer"),
     card: $("card"), item: $("item"), itemHint: $("item-hint"), tries: $("tries"), cheer: $("cheer"), mic: $("mic"), micCap: $("mic-cap"), listenText: $("listen-text"),
@@ -70,10 +73,10 @@
     };
   }
 
-  function makeItems() {
+  function makeItems(mix = MODES.k100.mix) {
     const pool = allItems();
     let items = [];
-    for (const [kind, n] of Object.entries(MIX)) items = items.concat(shuffle(pool[kind].slice()).slice(0, n));
+    for (const [kind, n] of Object.entries(mix)) items = items.concat(shuffle(pool[kind].slice()).slice(0, n));
     // Shuffle until the same letter never shows twice in a row (like B then b).
     for (let tries = 0; tries < 200; tries++) {
       shuffle(items);
@@ -162,8 +165,8 @@
 
   function saveGame() {
     if (!state || !state.playing) return;
-    const { name, items, results, queue, pos, startedAt, timeUp, keptGoing, grownup } = state;
-    store.set(KEYS.game, { name, items, results, queue, pos, startedAt, timeUp, keptGoing, grownup, elapsedMs: elapsedMs() });
+    const { name, mode, items, results, queue, pos, startedAt, timeUp, keptGoing, grownup } = state;
+    store.set(KEYS.game, { name, mode, items, results, queue, pos, startedAt, timeUp, keptGoing, grownup, elapsedMs: elapsedMs() });
   }
 
   function elapsedMs() {
@@ -181,17 +184,21 @@
     state.runningSince = Date.now();
   }
 
-  function startGame(name) {
+  function startGame(name, mode) {
     store.set(KEYS.name, name);
-    const items = makeItems();
+    if (!MODES[mode]) mode = "k100";
+    const items = makeItems(MODES[mode].mix);
     playGame({
-      name, items, results: items.map(newResult), queue: items.map((_, i) => i), pos: 0,
+      name, mode, items, results: items.map(newResult), queue: items.map((_, i) => i), pos: 0,
       startedAt: Date.now(), timeUp: false, keptGoing: false, grownup: false, elapsedMs: 0,
     });
   }
 
   function playGame(saved) {
-    state = { ...saved, playing: true, runningSince: null, finishedAt: null };
+    state = { mode: "k100", ...saved, playing: true, runningSince: null, finishedAt: null };
+    const m = modeOf(state.mode);
+    el.ofTotal.textContent = el.restartTotal.textContent = el.allTotal.textContent = String(m.total);
+    el.restartTime.textContent = fmt(m.seconds);
     el.playerName.textContent = state.name;
     el.cheer.textContent = "";
     el.timer.classList.remove("low");
@@ -321,8 +328,8 @@
     el.card.classList.remove("right", "wrong", "missed", "pop");
     void el.card.offsetWidth;
     el.card.classList.add("pop");
-    el.count.textContent = String(Math.min(TOTAL, doneCount() + 1));
-    el.progressBar.style.width = `${(doneCount() / TOTAL) * 100}%`;
+    el.count.textContent = String(Math.min(modeOf(state.mode).total, doneCount() + 1));
+    el.progressBar.style.width = `${(doneCount() / modeOf(state.mode).total) * 100}%`;
     renderTries(r);
     el.listenText.textContent = state.grownup ? "Say what you see!" : r.tries ? `Try again! ${MAX_TRIES - r.tries} ${MAX_TRIES - r.tries === 1 ? "try" : "tries"} left` : "Say what you see!";
     el.skip.disabled = false;
@@ -338,7 +345,7 @@
   }
   function tick() {
     if (!state || !state.playing) return;
-    const left = TIME_LIMIT_SECONDS - elapsedMs() / 1000;
+    const left = modeOf(state.mode).seconds - elapsedMs() / 1000;
     if (left <= 0) {
       el.timer.textContent = `+${fmt(-left)}`;
       el.timer.classList.add("over");
@@ -366,12 +373,12 @@
     if (heardKey) r.heard.push(heardKey);
     if (status === "right" || status === "missed") {
       r.status = status;
-      r.late = state.timeUp || elapsedMs() >= TIME_LIMIT_SECONDS * 1000;
+      r.late = state.timeUp || elapsedMs() >= modeOf(state.mode).seconds * 1000;
       busy = true;
       el.skip.disabled = true;
       const it = current();
       el.card.classList.add(status === "right" ? "right" : "missed");
-      el.progressBar.style.width = `${(doneCount() / TOTAL) * 100}%`;
+      el.progressBar.style.width = `${(doneCount() / modeOf(state.mode).total) * 100}%`;
       if (status === "right") {
         sound.right();
         el.listenText.textContent = `Yes! That's ${itemName(it)}`;
@@ -522,7 +529,7 @@
     if (restart) {
       busy = false;
       store.remove(KEYS.game);
-      startGame(state.name);
+      startGame(state.name, state.mode);
     } else {
       resumeClock();
     }
@@ -563,7 +570,7 @@
     const used = Math.round(elapsedMs() / 1000);
     const score = state.results.filter((r) => r.status === "right" && !r.late).length;
     const late = state.results.filter((r) => r.status === "right" && r.late).length;
-    const entry = { name: state.name, score, late, total: TOTAL, seconds: used, at: Date.now(), monkey: monkeyStyle };
+    const entry = { name: state.name, mode: state.mode, score, late, total: modeOf(state.mode).total, seconds: used, at: Date.now(), monkey: monkeyStyle };
     const history = store.get(KEYS.history, []);
     history.unshift(entry);
     store.set(KEYS.history, history.slice(0, HISTORY_LIMIT));
@@ -576,7 +583,7 @@
     const pct = entry.score / entry.total;
     el.resultsTitle.textContent = pct >= 0.9 ? `Amazing, ${entry.name}!` : pct >= 0.7 ? `Great job, ${entry.name}!` : `Nice work, ${entry.name}!`;
     el.scoreLine.innerHTML = `<strong>${entry.score}</strong> out of ${entry.total}` + (entry.late ? ` <span class="late-note">+ ${entry.late} after the bell ⏰</span>` : "");
-    el.timeLine.textContent = entry.seconds >= TIME_LIMIT_SECONDS ? `Used all ${fmt(TIME_LIMIT_SECONDS)}${entry.seconds > TIME_LIMIT_SECONDS ? ` and ${fmt(entry.seconds - TIME_LIMIT_SECONDS)} more` : ""}` : `Finished in ${fmt(entry.seconds)}`;
+    el.timeLine.textContent = entry.seconds >= modeOf(state.mode).seconds ? `Used all ${fmt(modeOf(state.mode).seconds)}${entry.seconds > modeOf(state.mode).seconds ? ` and ${fmt(entry.seconds - modeOf(state.mode).seconds)} more` : ""}` : `Finished in ${fmt(entry.seconds)}`;
     const missed = state.items.map((it, i) => ({ it, r: state.results[i] })).filter((x) => x.r.status === "missed");
     el.practiceSection.hidden = missed.length === 0;
     el.practice.innerHTML = missed.map(({ it, r }) => `<div class="chip"><span class="chip-item" data-kind="${it.kind}">${esc(it.show)}</span><span class="chip-sub">${r.heard.length ? `heard: ${r.heard.map((k) => esc(heardLabel(k))).join(", ")}` : "skipped"}</span></div>`).join("");
@@ -592,7 +599,7 @@
   function renderScores() {
     const history = store.get(KEYS.history, []);
     el.scoresList.innerHTML = history.length
-      ? `<table class="scores"><thead><tr><th>Date</th><th>Name</th><th>Score</th><th>Time</th></tr></thead><tbody>${history.map((h) => `<tr><td>${new Date(h.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</td><td>${esc(h.name)}</td><td><strong>${h.score}</strong>/${h.total}${h.late ? ` <span class="late-note">+${h.late}⏰</span>` : ""}</td><td>${fmt(h.seconds)}</td></tr>`).join("")}</tbody></table>`
+      ? `<table class="scores"><thead><tr><th>Date</th><th>Name</th><th>Game</th><th>Score</th><th>Time</th></tr></thead><tbody>${history.map((h) => `<tr><td>${new Date(h.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</td><td>${esc(h.name)}</td><td>${modeOf(h.mode || (h.total === MODES.k25.total ? "k25" : "k100")).label}</td><td><strong>${h.score}</strong>/${h.total}${h.late ? ` <span class="late-note">+${h.late}⏰</span>` : ""}</td><td>${fmt(h.seconds)}</td></tr>`).join("")}</tbody></table>`
       : `<p class="empty">No scores yet. Play a round and your score shows up here!</p>`;
     show("scores");
   }
@@ -620,14 +627,14 @@
     el.name.value = store.get(KEYS.name, "") || "";
     const saved = savedGame();
     el.resume.hidden = !saved;
-    if (saved) el.resume.textContent = `Keep going, ${saved.name}! (${saved.results.filter((r) => r.status).length} of ${TOTAL} done)`;
+    if (saved) el.resume.textContent = `Keep going, ${saved.name}! (${modeOf(saved.mode).label}: ${saved.results.filter((r) => r.status).length} of ${modeOf(saved.mode).total} done)`;
   }
   el.startForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const name = el.name.value.trim();
     if (!name) { el.name.focus(); return; }
     store.remove(KEYS.game);
-    startGame(name);
+    startGame(name, e.submitter && e.submitter.value);
   });
   el.resume.addEventListener("click", () => {
     const saved = savedGame();
@@ -674,5 +681,5 @@
   runSplash();
   loadSpeech().catch(() => {});
 
-  window.__k100 = { makeItems, allItems, getState: () => state, hear: (text, type = "final") => handleSpeech({ type, text }), KEYS, MIX, monkeyStyle };
+  window.__k100 = { makeItems, allItems, getState: () => state, hear: (text, type = "final") => handleSpeech({ type, text }), KEYS, MODES, monkeyStyle };
 })();
