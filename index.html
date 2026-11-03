@@ -105,7 +105,10 @@
         <div class="progress-text"><span id="count">1</span> of 50</div>
         <div class="progress" aria-hidden="true"><div id="progress-bar"></div></div>
       </div>
-      <div id="timer" class="timer" role="timer" aria-live="off">5:00</div>
+      <div class="bar-right">
+        <button id="restart" type="button" class="restart" aria-label="Start over with new cards"><span aria-hidden="true">↻</span> Restart</button>
+        <div id="timer" class="timer" role="timer" aria-live="off">5:00</div>
+      </div>
     </div>
 
     <div class="stage">
@@ -156,6 +159,18 @@
         <div class="overlay-btns">
           <button id="keep-going" type="button" class="btn primary">Keep going</button>
           <button id="see-score" type="button" class="btn secondary">See my score</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="restart-ask" class="overlay" hidden>
+      <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="restart-title">
+        <div class="monkey" data-pose="down"></div>
+        <h2 id="restart-title">Start over?</h2>
+        <p>You'll get 50 new cards and the clock goes back to 5:00. This game won't be saved.</p>
+        <div class="overlay-btns">
+          <button id="restart-no" type="button" class="btn primary">No, keep playing</button>
+          <button id="restart-yes" type="button" class="btn secondary">Yes, start over</button>
         </div>
       </div>
     </div>

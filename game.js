@@ -35,6 +35,7 @@
     grownup: $("grownup"), guRight: $("gu-right"), guWrong: $("gu-wrong"), skip: $("skip"), quit: $("quit"),
     overlay: $("overlay"), overlayTitle: $("overlay-title"), overlayText: $("overlay-text"), overlayBar: $("overlay-bar"),
     overlayGo: $("overlay-go"), overlayAlt: $("overlay-alt"),
+    restart: $("restart"), restartAsk: $("restart-ask"), restartYes: $("restart-yes"), restartNo: $("restart-no"),
     timesup: $("timesup"), keepGoing: $("keep-going"), seeScore: $("see-score"),
     resultsTitle: $("results-title"), scoreLine: $("score-line"), timeLine: $("time-line"), practiceSection: $("practice-section"),
     practice: $("practice"), grid: $("grid"), again: $("again"), resultsScores: $("results-scores"), print: $("print"),
@@ -175,7 +176,7 @@
     saveGame();
   }
   function resumeClock() {
-    if (!state || !state.playing || state.runningSince || overlayMode || !el.timesup.hidden) return;
+    if (!state || !state.playing || state.runningSince || document.hidden || overlayMode || !el.timesup.hidden || !el.restartAsk.hidden) return;
     state.runningSince = Date.now();
   }
 
@@ -195,6 +196,7 @@
     el.timer.classList.remove("low");
     el.timer.classList.toggle("over", state.timeUp);
     el.timesup.hidden = true;
+    el.restartAsk.hidden = true;
     el.grownup.hidden = !state.grownup;
     show("game");
     renderItem();
@@ -213,9 +215,11 @@
     try {
       await speech.startMic();
     } catch (e) {
+      if (!state || !state.playing || state.grownup) return;
       showSpeechProblem(e && (e.name === "NotAllowedError" || e.name === "SecurityError") ? "denied" : "nomic");
       return;
     }
+    if (!state || !state.playing || state.grownup) { speech.stopMic(); return; }
     if (earsState === "error") loadSpeech().catch(() => {});
     maybeBegin();
   }
@@ -223,6 +227,7 @@
   function maybeBegin() {
     if (!state || !state.playing || overlayMode !== "loading") return;
     if (!speech.isReady() || !speech.micRunning()) { renderLoadingOverlay(); return; }
+    if (document.hidden) { showOverlay("paused"); return; }
     speech.reset();
     hideOverlay();
     shownAt = Date.now();
@@ -230,6 +235,7 @@
 
   function useGrownupButtons() {
     state.grownup = true;
+    if (speech) speech.stopMic();
     el.grownup.hidden = false;
     hideOverlay();
     renderItem();
@@ -347,7 +353,7 @@
     if (heardKey) r.heard.push(heardKey);
     if (status === "right" || status === "missed") {
       r.status = status;
-      r.late = state.timeUp;
+      r.late = state.timeUp || elapsedMs() >= TIME_LIMIT_SECONDS * 1000;
       busy = true;
       el.skip.disabled = true;
       const it = current();
@@ -363,7 +369,8 @@
         el.cheer.textContent = "Good try!";
       }
       saveGame();
-      setTimeout(next, status === "right" ? 800 : 1500);
+      const game = state;
+      setTimeout(() => { if (state === game) next(); }, status === "right" ? 800 : 1500);
       return;
     }
     // A wrong try
@@ -392,13 +399,24 @@
     saveGame();
   }
 
+  // Back of the line, but never right next to the same letter in the other case.
+  function requeueAt(idx) {
+    const q = state.queue;
+    const key = state.items[idx].key;
+    const keyAt = (i) => (i > state.pos && i < q.length ? state.items[q[i]].key : null);
+    for (let at = q.length; at > state.pos + 1; at--) {
+      if (keyAt(at - 1) !== key && keyAt(at) !== key) return at;
+    }
+    return q.length;
+  }
+
   function skip() {
-    if (!state || busy || overlayMode || !el.timesup.hidden) return;
+    if (!state || blocked()) return;
     const idx = state.queue[state.pos];
     const r = state.results[idx];
     if (!r.skipped) {
       r.skipped = true;
-      state.queue.push(idx);
+      state.queue.splice(requeueAt(idx), 0, idx);
       state.pos += 1;
       if (speech && !state.grownup) speech.reset();
       renderItem();
@@ -408,7 +426,8 @@
     }
   }
 
-  function canListen() { return state && state.playing && !busy && !overlayMode && el.timesup.hidden && !state.grownup; }
+  const blocked = () => busy || overlayMode || !el.timesup.hidden || !el.restartAsk.hidden;
+  function canListen() { return state && state.playing && !blocked() && !state.grownup; }
 
   function handleSpeech(msg) {
     if (!canListen()) return;
@@ -429,8 +448,33 @@
   }
   if (speech) speech.on(handleSpeech);
 
-  el.guRight.addEventListener("click", () => { if (state && !busy && !overlayMode && el.timesup.hidden) mark("right"); });
-  el.guWrong.addEventListener("click", () => { if (state && !busy && !overlayMode && el.timesup.hidden) mark("wrong"); });
+  el.guRight.addEventListener("click", () => { if (state && !blocked()) mark("right"); });
+  el.guWrong.addEventListener("click", () => { if (state && !blocked()) mark("wrong"); });
+
+  // ---------- Restart ----------
+  function askRestart() {
+    if (!state || !state.playing) return;
+    pauseClock();
+    el.restartAsk.hidden = false;
+    el.restartNo.focus();
+  }
+  function closeRestart(restart) {
+    if (el.restartAsk.hidden) return;
+    el.restartAsk.hidden = true;
+    if (restart) {
+      busy = false;
+      store.remove(KEYS.game);
+      startGame(state.name);
+    } else {
+      resumeClock();
+    }
+  }
+  el.restart.addEventListener("click", () => { el.restart.blur(); askRestart(); });
+  el.restartNo.addEventListener("click", () => closeRestart(false));
+  el.restartYes.addEventListener("click", () => closeRestart(true));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !el.restartAsk.hidden) { e.preventDefault(); closeRestart(false); }
+  });
   el.skip.addEventListener("click", skip);
   el.quit.addEventListener("click", () => {
     if (!state) return;
@@ -524,7 +568,7 @@
   function onHide() {
     if (!state || !state.playing) return;
     pauseClock();
-    if (!overlayMode && el.timesup.hidden) showOverlay("paused");
+    if (!overlayMode && el.timesup.hidden && el.restartAsk.hidden) showOverlay("paused");
   }
   document.addEventListener("visibilitychange", () => { if (document.hidden) onHide(); });
   window.addEventListener("pagehide", onHide);

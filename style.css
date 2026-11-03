@@ -141,7 +141,12 @@ input[type="text"] { width: 100%; font: inherit; font-size: 1.5rem; padding: 12p
 .progress-text { text-align: center; font-weight: 700; font-size: 1.15rem; }
 .progress { height: 18px; background: #fff; border-radius: 999px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08); }
 .progress > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--banana), var(--banana-dark)); border-radius: 999px; transition: width 0.3s ease; }
-.timer { justify-self: end; font-weight: 800; font-size: 2.2rem; background: #fff; border-radius: 18px; padding: 2px 18px; box-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
+.bar-right { justify-self: end; display: flex; align-items: center; gap: 12px; }
+.restart { font: inherit; font-weight: 700; font-size: 1.15rem; border: 0; border-radius: 999px; padding: 8px 16px; background: #fff; color: var(--soft); box-shadow: 0 4px 0 rgba(31, 122, 67, 0.18); cursor: pointer; touch-action: manipulation; white-space: nowrap; }
+.restart span { font-size: 1.3rem; }
+.restart:active { translate: 0 2px; box-shadow: 0 2px 0 rgba(31, 122, 67, 0.18); }
+.restart:focus-visible { outline: 4px solid var(--banana-dark); outline-offset: 2px; }
+.timer { font-weight: 800; font-size: 2.2rem; background: #fff; border-radius: 18px; padding: 2px 18px; box-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
 .timer.low { color: var(--red); animation: pulse 1s infinite; }
 .timer.over { color: var(--soft); background: #f1ece4; }
 @keyframes pulse { 50% { transform: scale(1.06); } }
@@ -224,6 +229,8 @@ h2 { color: var(--leaf-dark); margin: 22px 0 10px; }
   .topbar { grid-template-columns: 1fr 1fr; padding-right: 60px; }
   .progress-wrap { grid-column: 1 / -1; grid-row: 2; }
   .grid { grid-template-columns: repeat(5, 1fr); }
+  .restart { font-size: 0; padding: 8px 12px; }
+  .restart span { font-size: 1.4rem; }
 }
 @media (orientation: portrait) and (min-width: 761px) {
   .stage { grid-template-columns: 1fr 3fr; }

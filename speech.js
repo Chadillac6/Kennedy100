@@ -94,6 +94,20 @@
     ]);
   }
 
+  // Like Vosk.createModel, but also fails (instead of waiting forever) when the worker reports an error.
+  function createModel(url) {
+    return new Promise((resolve, reject) => {
+      const m = new window.Vosk.Model(url, -1);
+      const fail = (msg) => {
+        try { m.terminate(); } catch (e) {}
+        reject(new Error((msg && msg.error) || "Speech model failed to load"));
+      };
+      m.on("load", (msg) => (msg.result ? resolve(m) : fail(msg)));
+      m.on("error", fail);
+      m.worker.addEventListener("error", fail);
+    });
+  }
+
   function load(onProgress = () => {}) {
     if (loading) return loading;
     loading = (async () => {
@@ -105,7 +119,7 @@
       onProgress(0.92);
       const url = URL.createObjectURL(blob);
       try {
-        model = await window.Vosk.createModel(url, -1);
+        model = await createModel(url);
       } finally {
         URL.revokeObjectURL(url);
       }
